@@ -1,0 +1,5 @@
+{
+  "name": "LabFlow LIMS",
+  "description": "Sistema Integral de Gestión de Laboratorio (LIMS) para control de muestras, técnicas analíticas, calidad e inventario.",
+  "requestFramePermissions": []
+}
