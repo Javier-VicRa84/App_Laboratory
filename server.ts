@@ -28,11 +28,61 @@ db.exec(`
     tax_id TEXT,
     address TEXT,
     city TEXT,
+    province TEXT,
+    country TEXT,
     phone TEXT,
     email TEXT,
     contact_person TEXT,
+    contact_mobile TEXT,
     notes TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS suppliers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT,
+    tax_id TEXT,
+    address TEXT,
+    city TEXT,
+    province TEXT,
+    country TEXT,
+    phone TEXT,
+    email TEXT,
+    contact_person TEXT,
+    contact_mobile TEXT,
+    category TEXT,
+    notes TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS external_customers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT,
+    tax_id TEXT,
+    address TEXT,
+    city TEXT,
+    province TEXT,
+    country TEXT,
+    phone TEXT,
+    email TEXT,
+    contact_person TEXT,
+    contact_mobile TEXT,
+    notes TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS internal_analyses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sample_type TEXT, -- Agua, Suelo, Alimento, etc.
+    description TEXT,
+    collection_date DATE,
+    analysis_date DATE,
+    result TEXT,
+    status TEXT DEFAULT 'pending',
+    responsible_id INTEGER,
+    observations TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(responsible_id) REFERENCES users(id)
   );
 
   CREATE TABLE IF NOT EXISTS techniques (
@@ -193,6 +243,19 @@ db.exec(`
 
 // Ensure schema updates for existing databases
 const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as any[];
+
+if (tables.some(t => t.name === 'customers')) {
+  const columns = db.prepare("PRAGMA table_info(customers)").all() as any[];
+  if (!columns.some(c => c.name === 'province')) {
+    db.prepare("ALTER TABLE customers ADD COLUMN province TEXT").run();
+  }
+  if (!columns.some(c => c.name === 'country')) {
+    db.prepare("ALTER TABLE customers ADD COLUMN country TEXT").run();
+  }
+  if (!columns.some(c => c.name === 'contact_mobile')) {
+    db.prepare("ALTER TABLE customers ADD COLUMN contact_mobile TEXT").run();
+  }
+}
 
 if (tables.some(t => t.name === 'triquinosis_jornadas')) {
   const columns = db.prepare("PRAGMA table_info(triquinosis_jornadas)").all() as any[];
@@ -369,6 +432,20 @@ async function startServer() {
 
   // API Routes
   
+  app.get("/api/health", (req, res) => {
+    try {
+      const userCount = db.prepare("SELECT count(*) as count FROM users").get() as any;
+      res.json({ 
+        status: "ok", 
+        database: "connected", 
+        users: userCount.count,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error: any) {
+      res.status(500).json({ status: "error", database: "error", message: error.message });
+    }
+  });
+  
   // Auth (Simplified for demo)
   app.post("/api/auth/login", (req, res) => {
     const { username, password } = req.body;
@@ -463,6 +540,9 @@ async function startServer() {
   };
 
   createCrudRoutes("customers", "customers");
+  createCrudRoutes("external_customers", "external-customers");
+  createCrudRoutes("suppliers", "suppliers");
+  createCrudRoutes("internal_analyses", "internal-analyses");
   createCrudRoutes("techniques", "techniques");
   createCrudRoutes("samples", "samples");
   createCrudRoutes("equipment", "equipment");

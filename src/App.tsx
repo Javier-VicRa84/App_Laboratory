@@ -16,6 +16,9 @@ import Reports from './components/Reports';
 import Quality from './components/Quality';
 import Documents from './components/Documents';
 import Inventory from './components/Inventory';
+import Suppliers from './components/Suppliers';
+import ExternalCustomers from './components/ExternalCustomers';
+import InternalAnalyses from './components/InternalAnalyses';
 import Triquinosis from './components/Triquinosis';
 import Users from './components/Users';
 import System from './components/System';
@@ -41,6 +44,9 @@ export default function App() {
       case 'quality': return <Quality />;
       case 'documents': return <Documents />;
       case 'inventory': return <Inventory />;
+      case 'suppliers': return <Suppliers />;
+      case 'external-customers': return <ExternalCustomers />;
+      case 'internal-analyses': return <InternalAnalyses />;
       case 'stats': return <Dashboard />; // Reusing dashboard for stats as it contains charts
       case 'users': return <Users />;
       case 'system': return <System />;

@@ -4,10 +4,59 @@ export interface Customer {
   tax_id: string;
   address: string;
   city: string;
+  province: string;
+  country: string;
   phone: string;
   email: string;
   contact_person: string;
+  contact_mobile: string;
   notes?: string;
+  created_at: string;
+}
+
+export interface Supplier {
+  id: number;
+  name: string;
+  tax_id: string;
+  address: string;
+  city: string;
+  province: string;
+  country: string;
+  phone: string;
+  email: string;
+  contact_person: string;
+  contact_mobile: string;
+  category: string;
+  notes?: string;
+  created_at: string;
+}
+
+export interface ExternalCustomer {
+  id: number;
+  name: string;
+  tax_id: string;
+  address: string;
+  city: string;
+  province: string;
+  country: string;
+  phone: string;
+  email: string;
+  contact_person: string;
+  contact_mobile: string;
+  notes?: string;
+  created_at: string;
+}
+
+export interface InternalAnalysis {
+  id: number;
+  sample_type: string;
+  description: string;
+  collection_date: string;
+  analysis_date: string;
+  result: string;
+  status: 'pending' | 'completed';
+  responsible_id: number;
+  observations?: string;
   created_at: string;
 }
 

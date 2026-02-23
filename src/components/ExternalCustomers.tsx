@@ -1,15 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, Search, Edit2, Trash2, Mail, Phone, MapPin, AlertCircle } from 'lucide-react';
-import { Customer } from '../types';
+import { Plus, Search, Edit2, Trash2, Mail, Phone, MapPin, AlertCircle, Globe } from 'lucide-react';
+import { ExternalCustomer } from '../types';
 
-export default function Customers() {
-  const [customers, setCustomers] = useState<Customer[]>([]);
+export default function ExternalCustomers() {
+  const [customers, setCustomers] = useState<ExternalCustomer[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [editingCustomer, setEditingCustomer] = useState<ExternalCustomer | null>(null);
 
   const fetchCustomers = () => {
-    fetch('/api/customers')
+    fetch('/api/external-customers')
       .then(res => res.json())
       .then(setCustomers);
   };
@@ -21,7 +21,7 @@ export default function Customers() {
     const formData = new FormData(e.currentTarget);
     const data = Object.fromEntries(formData.entries());
 
-    const url = editingCustomer ? `/api/customers/${editingCustomer.id}` : '/api/customers';
+    const url = editingCustomer ? `/api/external-customers/${editingCustomer.id}` : '/api/external-customers';
     const method = editingCustomer ? 'PUT' : 'POST';
 
     const res = await fetch(url, {
@@ -38,8 +38,8 @@ export default function Customers() {
   };
 
   const handleDelete = async (id: number) => {
-    if (confirm('¿Está seguro de eliminar este cliente?')) {
-      await fetch(`/api/customers/${id}`, { method: 'DELETE' });
+    if (confirm('¿Está seguro de eliminar este cliente externo?')) {
+      await fetch(`/api/external-customers/${id}`, { method: 'DELETE' });
       fetchCustomers();
     }
   };
@@ -53,15 +53,15 @@ export default function Customers() {
     <div className="p-8 space-y-6">
       <header className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold text-white tracking-tight">Clientes</h2>
-          <p className="text-zinc-500">Gestión de base de datos de clientes</p>
+          <h2 className="text-3xl font-bold text-white tracking-tight">Clientes Externos</h2>
+          <p className="text-zinc-500">Servicios a terceros y clientes fuera de producción propia</p>
         </div>
         <button 
           onClick={() => { setEditingCustomer(null); setIsModalOpen(true); }}
-          className="bg-emerald-500 hover:bg-emerald-600 text-black font-bold px-4 py-2 rounded-xl flex items-center gap-2 transition-all"
+          className="bg-blue-500 hover:bg-blue-600 text-white font-bold px-4 py-2 rounded-xl flex items-center gap-2 transition-all"
         >
           <Plus size={20} />
-          Nuevo Cliente
+          Nuevo Cliente Externo
         </button>
       </header>
 
@@ -72,7 +72,7 @@ export default function Customers() {
           placeholder="Buscar por nombre o CUIT/DNI..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full bg-[#151619] border border-white/10 rounded-2xl pl-12 pr-4 py-3 text-white focus:outline-none focus:border-emerald-500/50 transition-all"
+          className="w-full bg-[#151619] border border-white/10 rounded-2xl pl-12 pr-4 py-3 text-white focus:outline-none focus:border-blue-500/50 transition-all"
         />
       </div>
 
@@ -112,7 +112,7 @@ export default function Customers() {
               </div>
               {customer.contact_mobile && (
                 <div className="flex items-center gap-2">
-                  <Phone size={14} className="text-emerald-600/50" />
+                  <Phone size={14} className="text-blue-600/50" />
                   <span>Celular: {customer.contact_mobile}</span>
                 </div>
               )}
@@ -124,7 +124,6 @@ export default function Customers() {
 
             <div className="mt-6 pt-4 border-t border-white/5 flex justify-between items-center">
               <span className="text-[10px] text-zinc-600 uppercase tracking-widest font-bold">Contacto: {customer.contact_person}</span>
-              <button className="text-emerald-400 text-xs font-bold hover:underline">Ver Historial</button>
             </div>
           </div>
         ))}
@@ -132,8 +131,8 @@ export default function Customers() {
 
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-[#151619] border border-white/10 rounded-2xl w-full max-w-2xl p-8">
-            <h3 className="text-xl font-bold text-white mb-6">{editingCustomer ? 'Editar Cliente' : 'Nuevo Cliente'}</h3>
+          <div className="bg-[#151619] border border-white/10 rounded-2xl w-full max-w-2xl p-8 max-h-[90vh] overflow-y-auto custom-scrollbar">
+            <h3 className="text-xl font-bold text-white mb-6">{editingCustomer ? 'Editar Cliente Externo' : 'Nuevo Cliente Externo'}</h3>
             <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-6">
               <div className="col-span-2">
                 <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2">Razón Social / Nombre</label>
@@ -177,7 +176,7 @@ export default function Customers() {
               </div>
               <div className="col-span-2 flex justify-end gap-4 mt-4">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="px-6 py-2 text-zinc-400 hover:text-white transition-colors">Cancelar</button>
-                <button type="submit" className="bg-emerald-500 hover:bg-emerald-600 text-black font-bold px-8 py-2 rounded-xl transition-all">Guardar</button>
+                <button type="submit" className="bg-blue-500 hover:bg-blue-600 text-white font-bold px-8 py-2 rounded-xl transition-all">Guardar</button>
               </div>
             </form>
           </div>

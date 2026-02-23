@@ -57,6 +57,21 @@ export default function Triquinosis() {
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
   const [previewTitle, setPreviewTitle] = useState('');
 
+  const [isTestingApi, setIsTestingApi] = useState(false);
+
+  const testApi = async () => {
+    setIsTestingApi(true);
+    try {
+      const res = await fetch('/api/health');
+      const data = await res.json();
+      alert(`API Status: ${data.status}\nDatabase: ${data.database}\nUsers: ${data.users}`);
+    } catch (error: any) {
+      alert(`API Error: ${error.message}`);
+    } finally {
+      setIsTestingApi(false);
+    }
+  };
+
   const fetchData = async () => {
     try {
       const [jornadasRes, equipmentRes, samplesRes, customersRes, techniquesRes] = await Promise.all([
@@ -303,8 +318,10 @@ export default function Triquinosis() {
 
   const handleFinishJornada = async () => {
     console.log('handleFinishJornada triggered');
+    alert('Iniciando finalización de jornada...');
+    
     if (!currentJornada) {
-      alert('No hay una jornada activa para finalizar.');
+      alert('Error: No hay una jornada activa para finalizar.');
       return;
     }
     
@@ -350,6 +367,8 @@ export default function Triquinosis() {
 
   const handleDeleteTropa = async (id: number) => {
     console.log('handleDeleteTropa called with ID:', id);
+    alert(`Intentando eliminar tropa ID: ${id}`);
+    
     if (!id) {
       alert('Error: ID de tropa no válido.');
       return;
@@ -629,6 +648,14 @@ export default function Triquinosis() {
           <p className="text-zinc-500">Control Sanitario SENASA - Digestión Artificial</p>
         </div>
         <div className="flex items-center gap-2">
+          <button 
+            onClick={testApi}
+            disabled={isTestingApi}
+            className="p-2 text-zinc-400 hover:text-blue-400 transition-colors"
+            title="Testear Conexión API"
+          >
+            <Activity size={20} className={isTestingApi ? 'animate-pulse' : ''} />
+          </button>
           <button 
             onClick={fetchData}
             className="p-2 text-zinc-400 hover:text-white transition-colors"
@@ -1118,7 +1145,7 @@ export default function Triquinosis() {
             <h3 className="text-xl font-bold text-white mb-6">{editingTropa ? 'Editar Tropa' : 'Cargar Nueva Tropa'}</h3>
             <form onSubmit={handleAddTropa} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2">Productor / Cliente</label>
+                <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2">Productor</label>
                 <select name="customer_id" required defaultValue={editingTropa?.customer_id} className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-2 text-white">
                   <option value="">Seleccionar Productor...</option>
                   {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}

@@ -13,7 +13,8 @@ import {
   LogOut,
   Menu,
   X,
-  Terminal
+  Terminal,
+  Globe
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { motion, AnimatePresence } from 'motion/react';
@@ -32,7 +33,10 @@ interface SidebarProps {
 const menuItems = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'triquinosis', label: 'Triquinosis', icon: ShieldCheck },
-  { id: 'customers', label: 'Clientes', icon: Users },
+  { id: 'customers', label: 'Productores', icon: Users },
+  { id: 'external-customers', label: 'Clientes Externos', icon: Globe },
+  { id: 'suppliers', label: 'Proveedores', icon: Package },
+  { id: 'internal-analyses', label: 'Análisis Internos', icon: Beaker },
   { id: 'samples', label: 'Muestras', icon: Beaker },
   { id: 'techniques', label: 'Técnicas', icon: Settings },
   { id: 'results', label: 'Resultados', icon: ClipboardList },
