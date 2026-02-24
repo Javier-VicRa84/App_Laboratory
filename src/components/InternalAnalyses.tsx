@@ -9,6 +9,8 @@ export default function InternalAnalyses() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAnalysis, setEditingAnalysis] = useState<InternalAnalysis | null>(null);
 
+  const [parameters, setParameters] = useState<{ name: string; value: string }[]>([]);
+
   const fetchAnalyses = () => {
     fetch('/api/internal-analyses')
       .then(res => res.json())
@@ -17,10 +19,27 @@ export default function InternalAnalyses() {
 
   useEffect(fetchAnalyses, []);
 
+  useEffect(() => {
+    if (editingAnalysis) {
+      try {
+        setParameters(JSON.parse(editingAnalysis.parameters || '[]'));
+      } catch (e) {
+        setParameters([]);
+      }
+    } else {
+      setParameters([]);
+    }
+  }, [editingAnalysis]);
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const data = Object.fromEntries(formData.entries());
+    
+    const payload = {
+      ...data,
+      parameters: JSON.stringify(parameters)
+    };
 
     const url = editingAnalysis ? `/api/internal-analyses/${editingAnalysis.id}` : '/api/internal-analyses';
     const method = editingAnalysis ? 'PUT' : 'POST';
@@ -28,7 +47,7 @@ export default function InternalAnalyses() {
     const res = await fetch(url, {
       method,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
+      body: JSON.stringify(payload),
     });
 
     if (res.ok) {
@@ -40,8 +59,16 @@ export default function InternalAnalyses() {
 
   const handleDelete = async (id: number) => {
     if (confirm('¿Está seguro de eliminar este registro de análisis interno?')) {
-      await fetch(`/api/internal-analyses/${id}`, { method: 'DELETE' });
-      fetchAnalyses();
+      try {
+        const res = await fetch(`/api/internal-analyses/${id}`, { method: 'DELETE' });
+        if (res.ok) {
+          fetchAnalyses();
+        } else {
+          alert('Error al eliminar el registro');
+        }
+      } catch (error) {
+        alert('Error de conexión al eliminar');
+      }
     }
   };
 
@@ -117,9 +144,24 @@ export default function InternalAnalyses() {
                 <Clock size={14} className="text-zinc-600" />
                 <span>Análisis: {analysis.analysis_date || 'Pendiente'}</span>
               </div>
+              
+              {analysis.parameters && JSON.parse(analysis.parameters).length > 0 && (
+                <div className="py-2 border-y border-white/5 my-2">
+                  <p className="text-[10px] text-zinc-500 uppercase font-bold mb-2">Parámetros Medidos</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {JSON.parse(analysis.parameters).map((p: any, i: number) => (
+                      <div key={i} className="flex justify-between items-center bg-black/20 px-2 py-1 rounded">
+                        <span className="text-[10px] text-zinc-500">{p.name}:</span>
+                        <span className="text-[10px] text-zinc-200 font-bold">{p.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="flex items-center gap-2">
                 <Beaker size={14} className="text-zinc-600" />
-                <span className="font-medium text-zinc-200">Resultado: {analysis.result || 'En proceso...'}</span>
+                <span className="font-medium text-zinc-200">Resultado Global: {analysis.result || 'En proceso...'}</span>
               </div>
             </div>
 
@@ -168,9 +210,54 @@ export default function InternalAnalyses() {
                 <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2">Fecha Análisis</label>
                 <input name="analysis_date" type="date" defaultValue={editingAnalysis?.analysis_date} className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-2 text-white" />
               </div>
+              <div className="col-span-2 space-y-4">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest">Parámetros de Análisis</label>
+                  <button 
+                    type="button" 
+                    onClick={() => setParameters([...parameters, { name: '', value: '' }])}
+                    className="text-purple-400 text-[10px] font-bold uppercase hover:underline"
+                  >
+                    + Añadir Parámetro
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 gap-2">
+                  {parameters.map((p, i) => (
+                    <div key={i} className="flex gap-2 items-center">
+                      <input 
+                        placeholder="Nombre (Ej: pH, Cloro)" 
+                        value={p.name}
+                        onChange={(e) => {
+                          const newParams = [...parameters];
+                          newParams[i].name = e.target.value;
+                          setParameters(newParams);
+                        }}
+                        className="flex-1 bg-black/50 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white" 
+                      />
+                      <input 
+                        placeholder="Valor" 
+                        value={p.value}
+                        onChange={(e) => {
+                          const newParams = [...parameters];
+                          newParams[i].value = e.target.value;
+                          setParameters(newParams);
+                        }}
+                        className="flex-1 bg-black/50 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white" 
+                      />
+                      <button 
+                        type="button" 
+                        onClick={() => setParameters(parameters.filter((_, idx) => idx !== i))}
+                        className="text-zinc-600 hover:text-red-400"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
               <div className="col-span-2">
-                <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2">Resultado</label>
-                <input name="result" defaultValue={editingAnalysis?.result} className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-2 text-white" placeholder="Ej: Ausencia de coliformes" />
+                <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2">Resultado Global / Conclusión</label>
+                <input name="result" defaultValue={editingAnalysis?.result} className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-2 text-white" placeholder="Ej: Apto para consumo" />
               </div>
               <div className="col-span-2">
                 <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2">Observaciones</label>

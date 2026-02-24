@@ -17,6 +17,9 @@ export default function Techniques() {
     notes: ''
   });
 
+  const [editingTechnique, setEditingTechnique] = useState<Technique | null>(null);
+  const [config, setConfig] = useState<{ key: string; value: string }[]>([]);
+
   const fetchTechniques = () => {
     fetch('/api/techniques')
       .then(res => res.json())
@@ -25,12 +28,38 @@ export default function Techniques() {
 
   useEffect(fetchTechniques, []);
 
+  useEffect(() => {
+    if (editingTechnique) {
+      setFormData({
+        name: editingTechnique.name,
+        category: editingTechnique.category,
+        method: editingTechnique.method,
+        formula: editingTechnique.formula,
+        notes: editingTechnique.notes || ''
+      });
+      setVariables(JSON.parse(editingTechnique.variables || '[]'));
+      setConfig(JSON.parse(editingTechnique.config || '[]'));
+    } else {
+      setFormData({ name: '', category: 'Fisicoquímica', method: '', formula: '', notes: '' });
+      setVariables([]);
+      setConfig([]);
+    }
+  }, [editingTechnique]);
+
   const addVariable = () => {
     setVariables([...variables, { name: '', unit: '', type: 'variable' }]);
   };
 
   const removeVariable = (index: number) => {
     setVariables(variables.filter((_, i) => i !== index));
+  };
+
+  const addConfig = () => {
+    setConfig([...config, { key: '', value: '' }]);
+  };
+
+  const removeConfig = (index: number) => {
+    setConfig(config.filter((_, i) => i !== index));
   };
 
   const handleAiImport = async () => {
@@ -52,6 +81,9 @@ export default function Techniques() {
           "variables": [
             { "name": "NombreCortoVariable", "unit": "unidad", "type": "variable" | "constant" }
           ],
+          "config": [
+            { "key": "NombreFactor", "value": "valor" }
+          ],
           "notes": "Breve descripción adicional"
         }`,
         config: { responseMimeType: "application/json" }
@@ -66,6 +98,7 @@ export default function Techniques() {
         notes: result.notes || ''
       });
       setVariables(result.variables || []);
+      setConfig(result.config || []);
       setAiInput('');
     } catch (error) {
       console.error("Error con la IA:", error);
@@ -80,11 +113,15 @@ export default function Techniques() {
     const payload = {
       ...formData,
       variables: JSON.stringify(variables),
+      config: JSON.stringify(config),
       status: 'active'
     };
 
-    const res = await fetch('/api/techniques', {
-      method: 'POST',
+    const url = editingTechnique ? `/api/techniques/${editingTechnique.id}` : '/api/techniques';
+    const method = editingTechnique ? 'PUT' : 'POST';
+
+    const res = await fetch(url, {
+      method,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
@@ -92,8 +129,14 @@ export default function Techniques() {
     if (res.ok) {
       fetchTechniques();
       setIsModalOpen(false);
-      setVariables([]);
-      setFormData({ name: '', category: 'Fisicoquímica', method: '', formula: '', notes: '' });
+      setEditingTechnique(null);
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    if (confirm('¿Está seguro de eliminar esta técnica?')) {
+      await fetch(`/api/techniques/${id}`, { method: 'DELETE' });
+      fetchTechniques();
     }
   };
 
@@ -105,7 +148,7 @@ export default function Techniques() {
           <p className="text-zinc-500">Configuración de parámetros y fórmulas</p>
         </div>
         <button 
-          onClick={() => setIsModalOpen(true)}
+          onClick={() => { setEditingTechnique(null); setIsModalOpen(true); }}
           className="bg-emerald-500 hover:bg-emerald-600 text-black font-bold px-4 py-2 rounded-xl flex items-center gap-2 transition-all"
         >
           <Plus size={20} />
@@ -121,8 +164,19 @@ export default function Techniques() {
                 <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">{t.category}</span>
                 <h3 className="text-xl font-bold text-white">{t.name}</h3>
               </div>
-              <div className="p-2 bg-white/5 rounded-lg">
-                <Settings size={18} className="text-zinc-500" />
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => { setEditingTechnique(t); setIsModalOpen(true); }}
+                  className="p-2 hover:bg-white/10 rounded-lg text-zinc-400 hover:text-white transition-colors"
+                >
+                  <Settings size={18} />
+                </button>
+                <button 
+                  onClick={() => handleDelete(t.id)}
+                  className="p-2 hover:bg-red-500/10 rounded-lg text-zinc-500 hover:text-red-400 transition-colors"
+                >
+                  <Trash2 size={18} />
+                </button>
               </div>
             </div>
             
@@ -143,7 +197,12 @@ export default function Techniques() {
 
             <div className="mt-6 pt-4 border-t border-white/5 flex justify-between items-center text-xs">
               <span className="text-zinc-500">Método: <span className="text-zinc-300">{t.method}</span></span>
-              <button className="text-emerald-400 font-bold hover:underline">Editar Configuración</button>
+              <button 
+                onClick={() => { setEditingTechnique(t); setIsModalOpen(true); }}
+                className="text-emerald-400 font-bold hover:underline"
+              >
+                Editar Configuración
+              </button>
             </div>
           </div>
         ))}
@@ -153,8 +212,8 @@ export default function Techniques() {
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-[#151619] border border-white/10 rounded-2xl w-full max-w-5xl p-8 max-h-[90vh] overflow-y-auto custom-scrollbar">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-bold text-white">Configurar Nueva Técnica</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-zinc-500 hover:text-white">Cerrar</button>
+              <h3 className="text-xl font-bold text-white">{editingTechnique ? 'Editar Técnica' : 'Configurar Nueva Técnica'}</h3>
+              <button onClick={() => { setIsModalOpen(false); setEditingTechnique(null); }} className="text-zinc-500 hover:text-white">Cerrar</button>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -284,6 +343,49 @@ export default function Techniques() {
                             </select>
                           </div>
                           <button type="button" onClick={() => removeVariable(i)} className="p-2 text-zinc-600 hover:text-red-400 transition-colors">
+                            <Trash2 size={18} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Configuración (Factores/Constantes)</label>
+                      <button type="button" onClick={addConfig} className="text-emerald-400 text-xs font-bold flex items-center gap-1 hover:text-emerald-300">
+                        <Plus size={14} /> Añadir Factor
+                      </button>
+                    </div>
+                    
+                    <div className="space-y-3">
+                      {config.map((c, i) => (
+                        <div key={i} className="grid grid-cols-3 gap-4 items-end bg-black/20 p-4 rounded-xl border border-white/5">
+                          <div className="col-span-1">
+                            <label className="block text-[10px] text-zinc-600 uppercase mb-1">Clave (Ej: Factor Carne)</label>
+                            <input 
+                              value={c.key} 
+                              onChange={(e) => {
+                                const newConfig = [...config];
+                                newConfig[i].key = e.target.value;
+                                setConfig(newConfig);
+                              }}
+                              className="w-full bg-black/50 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white" 
+                            />
+                          </div>
+                          <div className="col-span-1">
+                            <label className="block text-[10px] text-zinc-600 uppercase mb-1">Valor</label>
+                            <input 
+                              value={c.value} 
+                              onChange={(e) => {
+                                const newConfig = [...config];
+                                newConfig[i].value = e.target.value;
+                                setConfig(newConfig);
+                              }}
+                              className="w-full bg-black/50 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white" 
+                            />
+                          </div>
+                          <button type="button" onClick={() => removeConfig(i)} className="p-2 text-zinc-600 hover:text-red-400 transition-colors">
                             <Trash2 size={18} />
                           </button>
                         </div>

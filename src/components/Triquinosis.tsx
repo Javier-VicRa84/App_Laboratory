@@ -14,6 +14,7 @@ import {
   ChevronRight,
   Save,
   Trash2,
+  Activity,
   History,
   RefreshCw,
   Pencil,
@@ -49,6 +50,7 @@ export default function Triquinosis() {
   const [isJornadaModalOpen, setIsJornadaModalOpen] = useState(false);
   const [isTropaModalOpen, setIsTropaModalOpen] = useState(false);
   const [isTempModalOpen, setIsTempModalOpen] = useState(false);
+  const [tropaFilter, setTropaFilter] = useState<'all' | 'internal' | 'external'>('all');
   const [isEditingJornada, setIsEditingJornada] = useState(false);
   const [editingTropa, setEditingTropa] = useState<TriquinosisTropa | null>(null);
   const [positivePoolId, setPositivePoolId] = useState<number | null>(null);
@@ -56,21 +58,6 @@ export default function Triquinosis() {
   const [observationsInput, setObservationsInput] = useState('');
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
   const [previewTitle, setPreviewTitle] = useState('');
-
-  const [isTestingApi, setIsTestingApi] = useState(false);
-
-  const testApi = async () => {
-    setIsTestingApi(true);
-    try {
-      const res = await fetch('/api/health');
-      const data = await res.json();
-      alert(`API Status: ${data.status}\nDatabase: ${data.database}\nUsers: ${data.users}`);
-    } catch (error: any) {
-      alert(`API Error: ${error.message}`);
-    } finally {
-      setIsTestingApi(false);
-    }
-  };
 
   const fetchData = async () => {
     try {
@@ -175,8 +162,9 @@ export default function Triquinosis() {
     const formData = new FormData(e.currentTarget);
     const data = Object.fromEntries(formData.entries());
     const totalAnimals = Number(data.total_animals);
+    const isInternal = data.is_internal === 'on' ? 1 : 0;
 
-    console.log('Saving tropa:', { editingTropa, data });
+    console.log('Saving tropa:', { editingTropa, data, isInternal });
 
     try {
       // Auto-delete if editing and animals is 0
@@ -201,7 +189,8 @@ export default function Triquinosis() {
           tropa_number: data.tropa_number,
           total_animals: totalAnimals,
           species: data.species,
-          category: data.category
+          category: data.category,
+          is_internal: isInternal
         }),
       });
 
@@ -218,6 +207,20 @@ export default function Triquinosis() {
       }
     } catch (error) {
       console.error('Error saving tropa:', error);
+    }
+  };
+
+  const filteredTropas = tropas.filter(t => {
+    if (tropaFilter === 'internal') return t.is_internal === 1;
+    if (tropaFilter === 'external') return t.is_internal === 0;
+    return true;
+  });
+
+  const handleCustomerChange = (customerId: string) => {
+    const customer = customers.find(c => c.id === Number(customerId));
+    const checkbox = document.getElementById('is_internal') as HTMLInputElement;
+    if (checkbox && customer) {
+      checkbox.checked = customer.category === 'Fábrica Propia';
     }
   };
 
@@ -317,21 +320,13 @@ export default function Triquinosis() {
   };
 
   const handleFinishJornada = async () => {
-    console.log('handleFinishJornada triggered');
-    alert('Iniciando finalización de jornada...');
+    if (!currentJornada) return;
     
-    if (!currentJornada) {
-      alert('Error: No hay una jornada activa para finalizar.');
-      return;
-    }
-    
-    // Check if pools exist
     if (pools.length === 0) {
       alert('No se puede finalizar una jornada sin haber generado los pools de análisis.');
       return;
     }
 
-    // Check if all pools are completed
     const pendingPools = pools.filter(p => p.result === 'pending');
     if (pendingPools.length > 0) {
       alert(`No se puede finalizar la jornada. Hay ${pendingPools.length} pools pendientes de resultado. Por favor, cargue todos los resultados (ND o P) antes de finalizar.`);
@@ -343,7 +338,6 @@ export default function Triquinosis() {
     }
 
     try {
-      console.log('Sending PUT request to finish jornada:', currentJornada.id);
       const res = await fetch(`/api/triquinosis-jornadas/${currentJornada.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -351,12 +345,9 @@ export default function Triquinosis() {
       });
 
       if (res.ok) {
-        console.log('Jornada marked as completed');
-        alert('¡Jornada finalizada con éxito!');
         await fetchData();
       } else {
         const err = await res.json();
-        console.error('Server error finishing jornada:', err);
         alert(`Error del servidor al finalizar: ${err.error || 'Error desconocido'}`);
       }
     } catch (error: any) {
@@ -366,22 +357,12 @@ export default function Triquinosis() {
   };
 
   const handleDeleteTropa = async (id: number) => {
-    console.log('handleDeleteTropa called with ID:', id);
-    alert(`Intentando eliminar tropa ID: ${id}`);
-    
-    if (!id) {
-      alert('Error: ID de tropa no válido.');
-      return;
-    }
+    if (!id) return;
     
     const confirmed = window.confirm('¿Está seguro de que desea eliminar esta tropa? Esta acción no se puede deshacer.');
-    if (!confirmed) {
-      console.log('Delete tropa cancelled by user');
-      return;
-    }
+    if (!confirmed) return;
     
     try {
-      console.log('Executing DELETE request for tropa ID:', id);
       const res = await fetch(`/api/triquinosis-tropas/${id}`, { 
         method: 'DELETE',
         headers: {
@@ -389,23 +370,15 @@ export default function Triquinosis() {
         }
       });
       
-      console.log('Delete tropa response status:', res.status);
-      
       if (!res.ok) {
-        const errorText = await res.text();
-        console.error('Delete tropa failed:', res.status, errorText);
         alert(`Error del servidor al eliminar: ${res.status}`);
         return;
       }
 
       const result = await res.json();
-      console.log('Delete result JSON:', result);
-
       if (result.success) {
-        alert('Tropa eliminada correctamente.');
         await fetchData();
         
-        // Use currentJornada from state to check pools
         if (currentJornada) {
           const poolsRes = await fetch(`/api/triquinosis-pools?jornada_id=${currentJornada.id}`);
           if (poolsRes.ok) {
@@ -649,14 +622,6 @@ export default function Triquinosis() {
         </div>
         <div className="flex items-center gap-2">
           <button 
-            onClick={testApi}
-            disabled={isTestingApi}
-            className="p-2 text-zinc-400 hover:text-blue-400 transition-colors"
-            title="Testear Conexión API"
-          >
-            <Activity size={20} className={isTestingApi ? 'animate-pulse' : ''} />
-          </button>
-          <button 
             onClick={fetchData}
             className="p-2 text-zinc-400 hover:text-white transition-colors"
             title="Refrescar Datos"
@@ -726,12 +691,27 @@ export default function Triquinosis() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-6">
             <div className="bg-[#151619] border border-white/10 rounded-2xl overflow-hidden">
-              <div className="p-4 border-b border-white/10 flex items-center justify-between bg-black/20">
-                <div className="flex items-center gap-2">
-                  <History size={18} className="text-red-400" />
-                  <h3 className="text-sm font-bold text-white uppercase tracking-widest">Tropas de la Jornada</h3>
-                </div>
-                {currentJornada && (
+                <div className="p-4 border-b border-white/10 flex items-center justify-between bg-black/20">
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <History size={18} className="text-red-400" />
+                      <h3 className="text-sm font-bold text-white uppercase tracking-widest">Tropas</h3>
+                    </div>
+                    <div className="flex gap-1 bg-black/40 p-0.5 rounded-lg border border-white/5">
+                      {(['all', 'external', 'internal'] as const).map((f) => (
+                        <button
+                          key={f}
+                          onClick={() => setTropaFilter(f)}
+                          className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-tighter transition-all ${
+                            tropaFilter === f ? 'bg-white/10 text-white' : 'text-zinc-500 hover:text-zinc-400'
+                          }`}
+                        >
+                          {f === 'all' ? 'Todas' : f === 'external' ? 'Clientes' : 'Internas'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  {currentJornada && (
                   <button 
                     onClick={() => setIsTropaModalOpen(true)}
                     className="text-red-400 text-xs font-bold flex items-center gap-1 hover:underline"
@@ -751,9 +731,17 @@ export default function Triquinosis() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
-                  {tropas.map(tropa => (
+                  {filteredTropas.map(tropa => (
                     <tr key={tropa.id} className="hover:bg-white/5 transition-colors">
-                      <td className="px-4 py-4 font-mono text-xs text-red-400 font-bold">{tropa.tropa_number}</td>
+                      <td className="px-4 py-4 font-mono text-xs text-red-400 font-bold">
+                        <div className="flex items-center gap-2">
+                          {tropa.is_internal === 1 && <Activity size={12} className="text-blue-400" />}
+                          {tropa.tropa_number}
+                          {tropa.is_internal === 1 && (
+                            <span className="bg-blue-500/20 text-blue-400 text-[8px] px-1 rounded uppercase tracking-tighter">Interno</span>
+                          )}
+                        </div>
+                      </td>
                       <td className="px-4 py-4 text-xs text-white">{customers.find(c => c.id === tropa.customer_id)?.name}</td>
                       <td className="px-4 py-4 text-xs text-zinc-300">{tropa.total_animals}</td>
                       <td className="px-4 py-4 text-right">
@@ -1146,9 +1134,15 @@ export default function Triquinosis() {
             <form onSubmit={handleAddTropa} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2">Productor</label>
-                <select name="customer_id" required defaultValue={editingTropa?.customer_id} className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-2 text-white">
+                <select 
+                  name="customer_id" 
+                  required 
+                  defaultValue={editingTropa?.customer_id} 
+                  onChange={(e) => handleCustomerChange(e.target.value)}
+                  className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-2 text-white"
+                >
                   <option value="">Seleccionar Productor...</option>
-                  {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  {customers.map(c => <option key={c.id} value={c.id}>{c.name} ({c.category || 'Productor'})</option>)}
                 </select>
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -1180,6 +1174,16 @@ export default function Triquinosis() {
                     <option value="Padrillo">Padrillo</option>
                   </select>
                 </div>
+              </div>
+              <div className="flex items-center gap-2 pt-2">
+                <input 
+                  type="checkbox" 
+                  name="is_internal" 
+                  id="is_internal"
+                  defaultChecked={editingTropa?.is_internal === 1}
+                  className="w-4 h-4 rounded border-white/10 bg-black/50 text-red-500 focus:ring-red-500/50" 
+                />
+                <label htmlFor="is_internal" className="text-xs font-bold text-zinc-300 uppercase tracking-widest cursor-pointer">Fábrica Propia / Análisis Interno</label>
               </div>
               <div className="flex justify-end gap-4 mt-6">
                 <button type="button" onClick={() => { setIsTropaModalOpen(false); setEditingTropa(null); }} className="px-6 py-2 text-zinc-400 hover:text-white transition-colors">Cancelar</button>

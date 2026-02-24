@@ -78,6 +78,7 @@ db.exec(`
     collection_date DATE,
     analysis_date DATE,
     result TEXT,
+    parameters TEXT, -- JSON string for multiple results
     status TEXT DEFAULT 'pending',
     responsible_id INTEGER,
     observations TEXT,
@@ -92,6 +93,7 @@ db.exec(`
     category TEXT,
     formula TEXT,
     variables TEXT, -- JSON string
+    config TEXT, -- JSON string for factors and other settings
     notes TEXT,
     status TEXT DEFAULT 'active',
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -176,6 +178,13 @@ db.exec(`
     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
+  CREATE TABLE IF NOT EXISTS settings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    key TEXT UNIQUE,
+    value TEXT,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
   CREATE TABLE IF NOT EXISTS triquinosis_jornadas (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     date DATE DEFAULT CURRENT_DATE,
@@ -196,6 +205,7 @@ db.exec(`
     total_animals INTEGER,
     species TEXT,
     category TEXT,
+    is_internal INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(jornada_id) REFERENCES triquinosis_jornadas(id),
     FOREIGN KEY(customer_id) REFERENCES customers(id)
@@ -255,6 +265,16 @@ if (tables.some(t => t.name === 'customers')) {
   if (!columns.some(c => c.name === 'contact_mobile')) {
     db.prepare("ALTER TABLE customers ADD COLUMN contact_mobile TEXT").run();
   }
+  if (!columns.some(c => c.name === 'category')) {
+    db.prepare("ALTER TABLE customers ADD COLUMN category TEXT DEFAULT 'Productor'").run();
+  }
+}
+
+if (tables.some(t => t.name === 'triquinosis_tropas')) {
+  const columns = db.prepare("PRAGMA table_info(triquinosis_tropas)").all() as any[];
+  if (!columns.some(c => c.name === 'is_internal')) {
+    db.prepare("ALTER TABLE triquinosis_tropas ADD COLUMN is_internal INTEGER DEFAULT 0").run();
+  }
 }
 
 if (tables.some(t => t.name === 'triquinosis_jornadas')) {
@@ -302,6 +322,35 @@ if (tables.some(t => t.name === 'triquinosis_tropas')) {
   }
 }
 
+
+if (tables.some(t => t.name === 'internal_analyses')) {
+  const columns = db.prepare("PRAGMA table_info(internal_analyses)").all() as any[];
+  if (!columns.some(c => c.name === 'parameters')) {
+    db.prepare("ALTER TABLE internal_analyses ADD COLUMN parameters TEXT").run();
+  }
+}
+
+if (tables.some(t => t.name === 'techniques')) {
+  const columns = db.prepare("PRAGMA table_info(techniques)").all() as any[];
+  if (!columns.some(c => c.name === 'config')) {
+    db.prepare("ALTER TABLE techniques ADD COLUMN config TEXT").run();
+  }
+}
+
+// Initialize default settings if they don't exist
+const defaultSettings = [
+  { key: 'lab_name', value: 'Laboratorio de Análisis Alimentarios' },
+  { key: 'lab_address', value: 'Calle Falsa 123, Ciudad' },
+  { key: 'lab_phone', value: '+54 11 4444-5555' },
+  { key: 'lab_email', value: 'contacto@laboratorio.com' },
+  { key: 'lab_logo', value: '' },
+  { key: 'director_name', value: 'Dr. Juan Pérez' },
+  { key: 'director_mat', value: 'MP 12345' }
+];
+
+for (const setting of defaultSettings) {
+  db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)").run(setting.key, setting.value);
+}
 
 // Seed default user if none exists
 const userCount = db.prepare("SELECT count(*) as count FROM users").get() as { count: number };
@@ -488,8 +537,6 @@ async function startServer() {
 
     app.put(`/api/${routeName}/:id`, (req, res) => {
       const id = req.params.id;
-      console.log(`[SERVER] PUT request for ${tableName} with ID: ${id}`);
-      console.log(`[SERVER] Body:`, JSON.stringify(req.body));
       try {
         // Remove id and created_at from update data to avoid errors
         const { id: bodyId, created_at, ...updateData } = req.body;
@@ -497,19 +544,15 @@ async function startServer() {
         const values = Object.values(updateData);
         
         if (keys.length === 0) {
-          console.log(`[SERVER] No data to update for ${tableName} ID: ${id}`);
           return res.json({ success: true, message: "No data to update" });
         }
         
         const setClause = keys.map(k => `${k} = ?`).join(",");
         const sql = `UPDATE ${tableName} SET ${setClause} WHERE id = ?`;
-        console.log(`[SERVER] Executing SQL: ${sql} with values: ${JSON.stringify([...values, id])}`);
         const stmt = db.prepare(sql);
         const info = stmt.run(...values, Number(id));
         
-        console.log(`[SERVER] Update result: ${info.changes} rows affected`);
         if (info.changes === 0) {
-          console.warn(`[SERVER] Record not found for ${tableName} ID: ${id}`);
           return res.status(404).json({ error: "Record not found" });
         }
         res.json({ success: true, changes: info.changes });
@@ -521,14 +564,10 @@ async function startServer() {
 
     app.delete(`/api/${routeName}/:id`, (req, res) => {
       const id = req.params.id;
-      console.log(`[SERVER] DELETE request for ${tableName} with ID: ${id}`);
       try {
         const sql = `DELETE FROM ${tableName} WHERE id = ?`;
-        console.log(`[SERVER] Executing SQL: ${sql} with ID: ${id}`);
         const info = db.prepare(sql).run(Number(id));
-        console.log(`[SERVER] Delete result: ${info.changes} rows affected`);
         if (info.changes === 0) {
-          console.warn(`[SERVER] Record not found for ${tableName} ID: ${id}`);
           return res.status(404).json({ error: "Record not found" });
         }
         res.json({ success: true, changes: info.changes });
@@ -554,6 +593,38 @@ async function startServer() {
   createCrudRoutes("triquinosis_pools", "triquinosis-pools");
   createCrudRoutes("triquinosis_temperatures", "triquinosis-temperatures");
   createCrudRoutes("triquinosis_ncf", "triquinosis-ncf");
+  createCrudRoutes("settings", "settings");
+
+  app.post("/api/users/reset-password/:id", (req, res) => {
+    const { password } = req.body;
+    try {
+      db.prepare("UPDATE users SET password = ? WHERE id = ?").run(password, Number(req.params.id));
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/settings-map", (req, res) => {
+    const settings = db.prepare("SELECT key, value FROM settings").all() as any[];
+    const map = settings.reduce((acc, s) => {
+      acc[s.key] = s.value;
+      return acc;
+    }, {});
+    res.json(map);
+  });
+
+  app.put("/api/settings-bulk", (req, res) => {
+    const settings = req.body; // { key: value, ... }
+    const stmt = db.prepare("UPDATE settings SET value = ? WHERE key = ?");
+    const updateMany = db.transaction((data) => {
+      for (const [key, value] of Object.entries(data)) {
+        stmt.run(value, key);
+      }
+    });
+    updateMany(settings);
+    res.json({ success: true });
+  });
 
   app.get("/api/audit_logs", (req, res) => {
     const logs = db.prepare(`
@@ -579,7 +650,7 @@ async function startServer() {
 
   app.get("/api/sample-analysis/:sampleId", (req, res) => {
     const analysis = db.prepare(`
-      SELECT sa.*, t.name as technique_name, t.formula, t.variables
+      SELECT sa.*, t.name as technique_name, t.formula, t.variables, t.config
       FROM sample_analysis sa
       JOIN techniques t ON sa.technique_id = t.id
       WHERE sa.sample_id = ?

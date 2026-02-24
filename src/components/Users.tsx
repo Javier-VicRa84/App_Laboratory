@@ -44,6 +44,24 @@ export default function Users() {
     }
   };
 
+  const handleResetPassword = async (id: number) => {
+    const newPassword = prompt('Ingrese la nueva contraseña:');
+    if (!newPassword) return;
+
+    const res = await fetch(`/api/users/reset-password/${id}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: newPassword }),
+    });
+
+    if (res.ok) {
+      alert('Contraseña restablecida con éxito');
+    } else {
+      const err = await res.json();
+      alert(`Error: ${err.error || 'No se pudo restablecer la contraseña'}`);
+    }
+  };
+
   const filtered = users.filter(u => 
     u.full_name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     u.username.toLowerCase().includes(searchTerm.toLowerCase())
@@ -120,7 +138,10 @@ export default function Users() {
               <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest ${u.status === 'active' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
                 {u.status || 'active'}
               </span>
-              <button className="text-zinc-500 hover:text-white text-[10px] font-bold uppercase tracking-widest flex items-center gap-1">
+              <button 
+                onClick={() => handleResetPassword(u.id)}
+                className="text-zinc-500 hover:text-white text-[10px] font-bold uppercase tracking-widest flex items-center gap-1"
+              >
                 <Lock size={10} /> Reset Clave
               </button>
             </div>

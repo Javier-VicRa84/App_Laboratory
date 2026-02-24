@@ -37,7 +37,24 @@ export default function Results() {
 
   const calculateResult = (analysis: Analysis) => {
     try {
-      const scope = inputValues[analysis.id] || {};
+      const scope: Record<string, number> = { ...(inputValues[analysis.id] || {}) };
+      
+      // Add config values (factors/constants) to scope
+      if (analysis.config) {
+        try {
+          const configValues = JSON.parse(analysis.config);
+          if (Array.isArray(configValues)) {
+            configValues.forEach((c: any) => {
+              if (c.key) {
+                scope[c.key] = parseFloat(c.value) || 0;
+              }
+            });
+          }
+        } catch (e) {
+          console.error("Error parsing analysis config:", e);
+        }
+      }
+
       const result = evaluate(analysis.formula || '0', scope);
       return Number(result.toFixed(4));
     } catch (e) {

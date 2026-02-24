@@ -10,6 +10,7 @@ export interface Customer {
   email: string;
   contact_person: string;
   contact_mobile: string;
+  category?: 'Productor' | 'Cliente' | 'Fábrica Propia';
   notes?: string;
   created_at: string;
 }
@@ -67,6 +68,7 @@ export interface Technique {
   category: string;
   formula: string;
   variables: string; // JSON string
+  config?: string; // JSON string
   notes?: string;
   status: 'active' | 'inactive';
   updated_at: string;
@@ -103,6 +105,7 @@ export interface Analysis {
   observations?: string;
   formula?: string;
   variables?: string; // Technique variables definition
+  config?: string; // Technique config definition
 }
 
 export interface Equipment {
@@ -160,6 +163,7 @@ export interface TriquinosisTropa {
   total_animals: number;
   species: string;
   category: string;
+  is_internal: number; // 0 or 1
   created_at: string;
 }
 

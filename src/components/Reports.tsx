@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { FileText, Download, QrCode, Search, CheckCircle2 } from 'lucide-react';
 import { Sample, Analysis } from '../types';
 import { jsPDF } from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -48,7 +48,7 @@ export default function Reports() {
       a.status === 'validated' ? 'Validado' : 'Pendiente'
     ]);
 
-    doc.autoTable({
+    autoTable(doc, {
       startY: 85,
       head: [['Parámetro', 'Resultado', 'Unidad', 'Estado']],
       body: tableData,
