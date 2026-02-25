@@ -8,6 +8,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const db = new Database("labflow.db");
+db.pragma('foreign_keys = ON');
 
 // Initialize Database Schema
 db.exec(`
@@ -71,21 +72,6 @@ db.exec(`
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
-  CREATE TABLE IF NOT EXISTS internal_analyses (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    sample_type TEXT, -- Agua, Suelo, Alimento, etc.
-    description TEXT,
-    collection_date DATE,
-    analysis_date DATE,
-    result TEXT,
-    parameters TEXT, -- JSON string for multiple results
-    status TEXT DEFAULT 'pending',
-    responsible_id INTEGER,
-    observations TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(responsible_id) REFERENCES users(id)
-  );
-
   CREATE TABLE IF NOT EXISTS techniques (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT,
@@ -114,7 +100,8 @@ db.exec(`
     dte TEXT,
     animal_species TEXT,
     sample_weight REAL,
-    FOREIGN KEY(customer_id) REFERENCES customers(id)
+    is_internal INTEGER DEFAULT 0,
+    FOREIGN KEY(customer_id) REFERENCES customers(id) ON DELETE CASCADE
   );
 
   CREATE TABLE IF NOT EXISTS sample_analysis (
@@ -127,8 +114,8 @@ db.exec(`
     analyst_id INTEGER,
     completed_at DATETIME,
     observations TEXT,
-    FOREIGN KEY(sample_id) REFERENCES samples(id),
-    FOREIGN KEY(technique_id) REFERENCES techniques(id),
+    FOREIGN KEY(sample_id) REFERENCES samples(id) ON DELETE CASCADE,
+    FOREIGN KEY(technique_id) REFERENCES techniques(id) ON DELETE CASCADE,
     FOREIGN KEY(analyst_id) REFERENCES users(id)
   );
 
@@ -207,8 +194,8 @@ db.exec(`
     category TEXT,
     is_internal INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(jornada_id) REFERENCES triquinosis_jornadas(id),
-    FOREIGN KEY(customer_id) REFERENCES customers(id)
+    FOREIGN KEY(jornada_id) REFERENCES triquinosis_jornadas(id) ON DELETE CASCADE,
+    FOREIGN KEY(customer_id) REFERENCES customers(id) ON DELETE CASCADE
   );
 
   CREATE TABLE IF NOT EXISTS triquinosis_pools (
@@ -225,7 +212,7 @@ db.exec(`
     composition_tropas TEXT,
     composition_counts TEXT,
     observations TEXT,
-    FOREIGN KEY(jornada_id) REFERENCES triquinosis_jornadas(id)
+    FOREIGN KEY(jornada_id) REFERENCES triquinosis_jornadas(id) ON DELETE CASCADE
   );
 
   CREATE TABLE IF NOT EXISTS triquinosis_temperatures (
@@ -235,7 +222,7 @@ db.exec(`
     water_temp REAL,
     chamber_temp REAL,
     observations TEXT,
-    FOREIGN KEY(jornada_id) REFERENCES triquinosis_jornadas(id)
+    FOREIGN KEY(jornada_id) REFERENCES triquinosis_jornadas(id) ON DELETE CASCADE
   );
 
   CREATE TABLE IF NOT EXISTS triquinosis_ncf (
@@ -253,6 +240,13 @@ db.exec(`
 
 // Ensure schema updates for existing databases
 const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as any[];
+
+if (tables.some(t => t.name === 'samples')) {
+  const columns = db.prepare("PRAGMA table_info(samples)").all() as any[];
+  if (!columns.some(c => c.name === 'is_internal')) {
+    db.prepare("ALTER TABLE samples ADD COLUMN is_internal INTEGER DEFAULT 0").run();
+  }
+}
 
 if (tables.some(t => t.name === 'customers')) {
   const columns = db.prepare("PRAGMA table_info(customers)").all() as any[];
@@ -322,13 +316,6 @@ if (tables.some(t => t.name === 'triquinosis_tropas')) {
   }
 }
 
-
-if (tables.some(t => t.name === 'internal_analyses')) {
-  const columns = db.prepare("PRAGMA table_info(internal_analyses)").all() as any[];
-  if (!columns.some(c => c.name === 'parameters')) {
-    db.prepare("ALTER TABLE internal_analyses ADD COLUMN parameters TEXT").run();
-  }
-}
 
 if (tables.some(t => t.name === 'techniques')) {
   const columns = db.prepare("PRAGMA table_info(techniques)").all() as any[];
@@ -537,6 +524,7 @@ async function startServer() {
 
     app.put(`/api/${routeName}/:id`, (req, res) => {
       const id = req.params.id;
+      console.log(`[SERVER] PUT /api/${routeName}/${id}`, req.body);
       try {
         // Remove id and created_at from update data to avoid errors
         const { id: bodyId, created_at, ...updateData } = req.body;
@@ -564,6 +552,7 @@ async function startServer() {
 
     app.delete(`/api/${routeName}/:id`, (req, res) => {
       const id = req.params.id;
+      console.log(`[SERVER] DELETE /api/${routeName}/${id}`);
       try {
         const sql = `DELETE FROM ${tableName} WHERE id = ?`;
         const info = db.prepare(sql).run(Number(id));
@@ -581,7 +570,6 @@ async function startServer() {
   createCrudRoutes("customers", "customers");
   createCrudRoutes("external_customers", "external-customers");
   createCrudRoutes("suppliers", "suppliers");
-  createCrudRoutes("internal_analyses", "internal-analyses");
   createCrudRoutes("techniques", "techniques");
   createCrudRoutes("samples", "samples");
   createCrudRoutes("equipment", "equipment");
@@ -642,7 +630,7 @@ async function startServer() {
     const samples = db.prepare(`
       SELECT s.*, c.name as customer_name 
       FROM samples s 
-      JOIN customers c ON s.customer_id = c.id
+      LEFT JOIN customers c ON s.customer_id = c.id
       ORDER BY s.entry_date DESC
     `).all();
     res.json(samples);

@@ -9,6 +9,7 @@ export default function Samples() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [techniques, setTechniques] = useState<Technique[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isInternal, setIsInternal] = useState(false);
 
   const fetchData = async () => {
     const [sRes, cRes, tRes] = await Promise.all([
@@ -34,11 +35,12 @@ export default function Samples() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         code: `M-${Date.now().toString().slice(-6)}`,
-        customer_id: data.customer_id,
+        customer_id: isInternal ? null : data.customer_id,
         type: data.type,
         description: data.description,
         estimated_delivery: data.estimated_delivery,
         responsible_service: data.responsible_service,
+        is_internal: isInternal ? 1 : 0,
         status: 'pending'
       }),
     });
@@ -58,6 +60,7 @@ export default function Samples() {
 
       fetchData();
       setIsModalOpen(false);
+      setIsInternal(false);
     }
   };
 
@@ -103,7 +106,11 @@ export default function Samples() {
                   <span className="font-mono text-emerald-400 font-bold">{sample.code}</span>
                 </td>
                 <td className="px-6 py-4">
-                  <p className="text-sm font-medium text-white">{sample.customer_name}</p>
+                  {sample.is_internal || !sample.customer_name ? (
+                    <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full uppercase tracking-wider">Análisis Interno</span>
+                  ) : (
+                    <p className="text-sm font-medium text-white">{sample.customer_name}</p>
+                  )}
                 </td>
                 <td className="px-6 py-4">
                   <span className="text-xs text-zinc-400">{sample.type}</span>
@@ -135,13 +142,30 @@ export default function Samples() {
           <div className="bg-[#151619] border border-white/10 rounded-2xl w-full max-w-3xl p-8 max-h-[90vh] overflow-y-auto custom-scrollbar">
             <h3 className="text-xl font-bold text-white mb-6">Nuevo Ingreso de Muestra</h3>
             <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-6">
-              <div className="col-span-2 lg:col-span-1">
-                <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2">Cliente</label>
-                <select name="customer_id" required className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-2 text-white">
-                  <option value="">Seleccionar Cliente...</option>
-                  {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
+              <div className="col-span-2">
+                <label className="flex items-center gap-3 p-4 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl cursor-pointer hover:bg-emerald-500/10 transition-all">
+                  <input 
+                    type="checkbox" 
+                    checked={isInternal} 
+                    onChange={(e) => setIsInternal(e.target.checked)}
+                    className="w-5 h-5 accent-emerald-500" 
+                  />
+                  <div>
+                    <p className="text-sm font-bold text-emerald-400 uppercase tracking-widest">¿Es para Análisis Interno?</p>
+                    <p className="text-xs text-zinc-500">Marque esta opción si la muestra no pertenece a un cliente externo.</p>
+                  </div>
+                </label>
               </div>
+
+              {!isInternal && (
+                <div className="col-span-2 lg:col-span-1">
+                  <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2">Cliente</label>
+                  <select name="customer_id" required className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-2 text-white">
+                    <option value="">Seleccionar Cliente...</option>
+                    {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+              )}
               <div className="col-span-2 lg:col-span-1">
                 <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2">Tipo de Muestra</label>
                 <select name="type" required className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-2 text-white">

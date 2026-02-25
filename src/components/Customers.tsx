@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, Search, Edit2, Trash2, Mail, Phone, MapPin, AlertCircle } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Mail, Phone, MapPin, AlertCircle, Download } from 'lucide-react';
 import { Customer } from '../types';
+import { exportToExcel } from '../services/excelService';
 
 export default function Customers() {
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -45,6 +46,20 @@ export default function Customers() {
     }
   };
 
+  const handleExportExcel = () => {
+    const exportData = customers.map(c => ({
+      'Razón Social': c.name,
+      'CUIT/DNI': c.tax_id,
+      'Categoría': c.category || 'Productor',
+      'Contacto': c.contact_person,
+      'Email': c.email,
+      'Teléfono': c.phone,
+      'Celular': c.contact_mobile,
+      'Dirección': `${c.address}, ${c.city}, ${c.province}`
+    }));
+    exportToExcel(exportData, 'Clientes_Laboratorio', 'Clientes');
+  };
+
   const filtered = customers.filter(c => 
     (categoryFilter === 'all' || c.category === categoryFilter) &&
     (c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -65,13 +80,22 @@ export default function Customers() {
           <h2 className="text-3xl font-bold text-white tracking-tight">Clientes</h2>
           <p className="text-zinc-500">Gestión de base de datos de clientes</p>
         </div>
-        <button 
-          onClick={() => { setEditingCustomer(null); setIsModalOpen(true); }}
-          className="bg-emerald-500 hover:bg-emerald-600 text-black font-bold px-4 py-2 rounded-xl flex items-center gap-2 transition-all"
-        >
-          <Plus size={20} />
-          Nuevo Cliente
-        </button>
+        <div className="flex gap-2">
+          <button 
+            onClick={handleExportExcel}
+            className="bg-white/5 hover:bg-white/10 text-zinc-400 font-bold px-4 py-2 rounded-xl flex items-center gap-2 transition-all border border-white/10"
+          >
+            <Download size={20} />
+            Exportar Excel
+          </button>
+          <button 
+            onClick={() => { setEditingCustomer(null); setIsModalOpen(true); }}
+            className="bg-emerald-500 hover:bg-emerald-600 text-black font-bold px-4 py-2 rounded-xl flex items-center gap-2 transition-all"
+          >
+            <Plus size={20} />
+            Nuevo Cliente
+          </button>
+        </div>
       </header>
 
       <div className="flex flex-col md:flex-row gap-4">

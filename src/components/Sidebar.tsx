@@ -36,7 +36,6 @@ const menuItems = [
   { id: 'customers', label: 'Productores', icon: Users },
   { id: 'external-customers', label: 'Clientes Externos', icon: Globe },
   { id: 'suppliers', label: 'Proveedores', icon: Package },
-  { id: 'internal-analyses', label: 'Análisis Internos', icon: Beaker },
   { id: 'samples', label: 'Muestras', icon: Beaker },
   { id: 'techniques', label: 'Técnicas', icon: Settings },
   { id: 'results', label: 'Resultados', icon: ClipboardList },
@@ -53,6 +52,26 @@ const menuItems = [
 export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
   const { logout, user } = useAuthStore();
   const [isOpen, setIsOpen] = React.useState(true);
+  const [deferredPrompt, setDeferredPrompt] = React.useState<any>(null);
+
+  React.useEffect(() => {
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    });
+  }, []);
+
+  const handleInstall = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setDeferredPrompt(null);
+      }
+    } else {
+      alert('La aplicación ya está instalada o su navegador no soporta la instalación directa. Puede usar "Agregar a la pantalla de inicio" en su navegador.');
+    }
+  };
 
   const filteredMenuItems = menuItems.filter(item => !item.role || item.role === user?.role);
 
@@ -88,7 +107,7 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
         ))}
       </nav>
 
-      <div className="p-4 border-t border-white/10">
+      <div className="p-4 border-t border-white/10 space-y-2">
         {isOpen && (
           <div className="mb-4 px-2">
             <p className="text-xs text-zinc-500 uppercase tracking-widest font-bold">Usuario</p>
@@ -96,6 +115,15 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
             <p className="text-[10px] text-zinc-500 uppercase">{user?.role}</p>
           </div>
         )}
+        
+        <button
+          onClick={handleInstall}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-emerald-400 hover:bg-emerald-500/10 transition-colors"
+        >
+          <Package size={20} />
+          {isOpen && <span className="text-sm font-medium">Versión Escritorio</span>}
+        </button>
+
         <button
           onClick={logout}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-zinc-400 hover:bg-red-500/10 hover:text-red-400 transition-colors"

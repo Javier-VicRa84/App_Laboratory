@@ -90,6 +90,7 @@ export interface Sample {
   dte?: string;
   animal_species?: string;
   sample_weight?: number;
+  is_internal?: number; // 0 or 1
 }
 
 export interface Analysis {

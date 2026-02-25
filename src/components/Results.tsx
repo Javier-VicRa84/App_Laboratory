@@ -102,7 +102,9 @@ export default function Results() {
                   <span className="font-mono text-emerald-400 font-bold text-sm">{sample.code}</span>
                   <span className="text-[10px] text-zinc-500">{sample.type}</span>
                 </div>
-                <p className="text-sm font-medium text-white truncate">{sample.customer_name}</p>
+                <p className="text-sm font-medium text-white truncate">
+                  {sample.is_internal ? 'Análisis Interno' : (sample.customer_name || 'Sin Cliente')}
+                </p>
               </button>
             ))}
           </div>

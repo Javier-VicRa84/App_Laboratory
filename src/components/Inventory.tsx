@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Package, Plus, AlertCircle, TrendingDown, Search, Trash2 } from 'lucide-react';
+import { Package, Plus, AlertCircle, TrendingDown, Search, Trash2, Download } from 'lucide-react';
 import { InventoryItem } from '../types';
+import { exportToExcel } from '../services/excelService';
 
 export default function Inventory() {
   const [items, setItems] = useState<InventoryItem[]>([]);
@@ -66,6 +67,19 @@ export default function Inventory() {
     }
   };
 
+  const handleExportExcel = () => {
+    const exportData = items.map(item => ({
+      'Nombre': item.name,
+      'Lote': item.batch,
+      'Stock': item.stock,
+      'Unidad': item.unit,
+      'Stock Mínimo': item.min_stock,
+      'Vencimiento': item.expiry_date,
+      'Ubicación': item.location
+    }));
+    exportToExcel(exportData, 'Inventario_Laboratorio', 'Stock');
+  };
+
   return (
     <div className="p-8 space-y-6">
       <header className="flex items-center justify-between">
@@ -73,13 +87,22 @@ export default function Inventory() {
           <h2 className="text-3xl font-bold text-white tracking-tight">Inventario</h2>
           <p className="text-zinc-500">Control de reactivos e insumos</p>
         </div>
-        <button 
-          onClick={() => setIsModalOpen(true)}
-          className="bg-emerald-500 hover:bg-emerald-600 text-black font-bold px-4 py-2 rounded-xl flex items-center gap-2 transition-all"
-        >
-          <Plus size={20} />
-          Nuevo Insumo
-        </button>
+        <div className="flex gap-2">
+          <button 
+            onClick={handleExportExcel}
+            className="bg-white/5 hover:bg-white/10 text-zinc-400 font-bold px-4 py-2 rounded-xl flex items-center gap-2 transition-all border border-white/10"
+          >
+            <Download size={20} />
+            Exportar Excel
+          </button>
+          <button 
+            onClick={() => setIsModalOpen(true)}
+            className="bg-emerald-500 hover:bg-emerald-600 text-black font-bold px-4 py-2 rounded-xl flex items-center gap-2 transition-all"
+          >
+            <Plus size={20} />
+            Nuevo Insumo
+          </button>
+        </div>
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">

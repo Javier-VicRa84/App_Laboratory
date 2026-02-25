@@ -35,6 +35,7 @@ import { es } from 'date-fns/locale';
 import { useAuthStore } from '../store/authStore';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { exportToExcel } from '../services/excelService';
 
 export default function Triquinosis() {
   const { user } = useAuthStore();
@@ -225,7 +226,14 @@ export default function Triquinosis() {
   };
 
   const handleGeneratePools = async () => {
-    if (!currentJornada || tropas.length === 0) return;
+    if (!currentJornada) {
+      alert('Inicie una jornada primero.');
+      return;
+    }
+    if (tropas.length === 0) {
+      alert('Debe cargar al menos una tropa para generar los pools.');
+      return;
+    }
 
     const poolSize = currentJornada.type === 'normal' ? 20 : 10;
     
@@ -321,6 +329,7 @@ export default function Triquinosis() {
 
   const handleFinishJornada = async () => {
     if (!currentJornada) return;
+    console.log('Finishing jornada:', currentJornada.id);
     
     if (pools.length === 0) {
       alert('No se puede finalizar una jornada sin haber generado los pools de análisis.');
@@ -397,6 +406,23 @@ export default function Triquinosis() {
       console.error('Error in handleDeleteTropa:', error);
       alert(`Error de conexión al eliminar: ${error.message}`);
     }
+  };
+
+  const handleExportJornadaExcel = () => {
+    if (!currentJornada) return;
+    
+    const exportData = pools.map(p => ({
+      'Fecha': currentJornada.date,
+      'Pool N°': p.pool_number,
+      'Tropas': p.composition_tropas,
+      'Rango': `${p.range_start} - ${p.range_end}`,
+      'Cant. Muestras': p.sample_count,
+      'Resultado': p.result === 'ND' ? 'Negativo' : (p.result === 'P' ? 'Positivo' : 'Pendiente'),
+      'Larvas/g': p.larvae_count || 0,
+      'Observaciones': p.observations || ''
+    }));
+
+    exportToExcel(exportData, `Jornada_Triquinosis_${currentJornada.date}`, 'Pools');
   };
 
   const handleUpdatePoolResult = async (poolId: number, result: 'ND' | 'P', larvaeCount: number = 0, observations: string = '') => {
@@ -633,6 +659,13 @@ export default function Triquinosis() {
               <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               <span className="text-xs font-bold text-emerald-400 uppercase tracking-widest">Jornada Activa: {format(new Date(currentJornada.date), 'dd/MM/yyyy')}</span>
               <div className="flex items-center gap-2 ml-4 border-l border-emerald-500/20 pl-4">
+                <button 
+                  onClick={handleExportJornadaExcel}
+                  className="text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-all flex items-center gap-1"
+                  title="Exportar a Excel"
+                >
+                  <Download size={12} /> Excel
+                </button>
                 <button 
                   onClick={() => {
                     setIsEditingJornada(true);
