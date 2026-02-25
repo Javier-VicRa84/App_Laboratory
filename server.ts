@@ -236,6 +236,30 @@ db.exec(`
     status TEXT DEFAULT 'open',
     FOREIGN KEY(responsible_id) REFERENCES users(id)
   );
+
+  CREATE TABLE IF NOT EXISTS qc_materials (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT,
+    lot_number TEXT,
+    technique_id INTEGER,
+    target_value REAL,
+    std_deviation REAL,
+    expiry_date DATE,
+    status TEXT DEFAULT 'active',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(technique_id) REFERENCES techniques(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS qc_results (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    material_id INTEGER,
+    value REAL,
+    analyst_id INTEGER,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    observations TEXT,
+    FOREIGN KEY(material_id) REFERENCES qc_materials(id) ON DELETE CASCADE,
+    FOREIGN KEY(analyst_id) REFERENCES users(id)
+  );
 `);
 
 // Ensure schema updates for existing databases
@@ -582,6 +606,8 @@ async function startServer() {
   createCrudRoutes("triquinosis_temperatures", "triquinosis-temperatures");
   createCrudRoutes("triquinosis_ncf", "triquinosis-ncf");
   createCrudRoutes("settings", "settings");
+  createCrudRoutes("qc_materials", "qc-materials");
+  createCrudRoutes("qc_results", "qc-results");
 
   app.post("/api/users/reset-password/:id", (req, res) => {
     const { password } = req.body;
@@ -644,6 +670,27 @@ async function startServer() {
       WHERE sa.sample_id = ?
     `).all(req.params.sampleId);
     res.json(analysis);
+  });
+
+  app.get("/api/qc-results-detailed", (req, res) => {
+    const results = db.prepare(`
+      SELECT r.*, m.name as material_name, m.target_value, m.std_deviation, u.full_name as analyst_name
+      FROM qc_results r
+      JOIN qc_materials m ON r.material_id = m.id
+      LEFT JOIN users u ON r.analyst_id = u.id
+      ORDER BY r.timestamp DESC
+    `).all();
+    res.json(results);
+  });
+
+  app.get("/api/qc-materials-detailed", (req, res) => {
+    const materials = db.prepare(`
+      SELECT m.*, t.name as technique_name
+      FROM qc_materials m
+      LEFT JOIN techniques t ON m.technique_id = t.id
+      ORDER BY m.created_at DESC
+    `).all();
+    res.json(materials);
   });
 
   app.post("/api/sample-analysis", (req, res) => {
